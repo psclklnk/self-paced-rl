@@ -1,0 +1,9 @@
+.idea
+.DS_Store
+logs
+plot_logs
+plots
+venv
+*/__pycache__
+*/*/__pycache__
+*/*/*/__pycache__

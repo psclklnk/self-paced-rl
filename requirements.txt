@@ -1,0 +1,7 @@
+matplotlib==3.0.2
+matplotlib2tikz==0.6.18
+numpy==1.16.4
+scikit-learn==0.20.2
+scipy==1.1.0
+cma==2.7.0
+mpi4py

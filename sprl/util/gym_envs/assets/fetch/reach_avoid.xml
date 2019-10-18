@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco>
+    <compiler angle="radian" coordinate="local" meshdir="../stls/fetch" texturedir="../textures"/>
+	<!--<option timestep="0.002">-->
+    <option timestep="0.008">
+    <!--<option timestep="0.04">-->
+        <flag warmstart="enable"/>
+	</option>
+
+    <include file="shared.xml"/>
+
+	<worldbody>
+        <geom name="floor0" pos="0.8 0.75 0" size="0.85 0.7 1" type="plane" condim="3" material="floor_mat"/>
+		<body name="floor0" pos="0.8 0.75 0">
+            <site name="target0" pos="0 0 0.5" size="0.02 0.02 0.02" rgba="1 0 0 1" type="sphere"/>
+		</body>
+
+        <include file="robot.xml"/>
+
+		<body pos="1.3 0.75 0.2" name="table0">
+            <camera mode="fixed" fovy="50" name="visualization_camera" pos="0.0 0.0 1.2" axisangle="0.0 0.0 -1.0 -1.57"/>
+            <geom size="0.2 0.4 0.2" type="box" mass="2000" material="table_mat" name="table_geom"/>
+            <body pos="-0.19 0.0 0.25" name="table_near_boundary">
+                <geom size="0.01 0.4 0.06" type="box" mass="2000" material="table_mat" name="table_near_boundary_geom"/>
+            </body>
+            <body pos="0.19 0.0 0.25" name="table_far_boundary">
+                <geom size="0.01 0.4 0.06" type="box" mass="2000" material="table_mat" name="table_far_boundary_geom"/>
+            </body>
+            <body pos="0.0 0.39 0.25" name="table_behind_boundary">
+                <geom size="0.2 0.01 0.06" type="box" mass="2000" material="table_mat" name="table_behind_boundary_geom"/>
+            </body>
+
+		</body>
+
+        <body name="obstacle" pos="1.3 0.85 0.45">
+            <geom type="box" size="0.05 0.025 0.05" rgba="0 1 1 1" name="obstacle_geom"  euler="0 0 -0.5"/>
+        </body>
+
+        <body name="obstacle1" pos="1.3 0.66 0.45">
+            <geom type="box" size="0.05 0.025 0.05" rgba="0 1 1 1" name="obstacle_geom1" euler="0 0 -0.2"/>
+        </body>
+
+        <body name="obstacle2" pos="1.16 0.65 0.45">
+            <geom type="box" size="0.08 0.025 0.05" rgba="0 1 1 1" name="obstacle_geom2" euler="0 0 1.7"/>
+        </body>
+
+        <body name="obstacle3" pos="1.23 0.52 0.45">
+            <geom type="box" size="0.11 0.025 0.05" rgba="0 1 1 1" name="obstacle_geom3" euler="0 0 0.4"/>
+        </body>
+
+        <!--<body name="obstacle" pos="1.3 0.78 0.45">-->
+            <!--<camera mode="fixed" fovy="50" name="visualization_camera" pos="0.0 -0.1 1.2" axisangle="0.0 0.0 -1.0 -1.57"/>-->
+            <!--<geom type="box" size="0.05 0.025 0.05" rgba="0 1 1 1" name="obstacle_geom"/>-->
+        <!--</body>-->
+
+        <!--<body name="obstacle1" pos="1.3 0.57 0.45">-->
+            <!--<geom type="box" size="0.05 0.025 0.05" rgba="0 1 1 1" name="obstacle_geom1"/>-->
+        <!--</body>-->
+
+        <light directional="true" ambient="0.2 0.2 0.2" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" castshadow="false"
+               pos="0 0 4" dir="0 0 -1" name="light0"/>
+	</worldbody>
+
+    <actuator/>
+</mujoco>
