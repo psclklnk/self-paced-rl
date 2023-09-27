@@ -10,7 +10,8 @@ from sprl.policies.kl_wlr import KLWLRPolicy
 import os
 import scipy.linalg as scpla
 import numpy as np
-import mujoco_py
+# import mujoco_py
+import mujoco
 import pickle
 import copy
 
@@ -73,9 +74,9 @@ class BallInACupCostFunction:
                                      "ball-in-a-cup" + str(seed) + ".xml")
 
     @staticmethod
-    def _check_collision(sim, ball_id, collision_ids):
-        for coni in range(0, sim.data.ncon):
-            con = sim.data.contact[coni]
+    def _check_collision(data, ball_id, collision_ids):
+        for coni in range(0, data.ncon):
+            con = data.contact[coni]
 
             collision = con.geom1 in collision_ids and con.geom2 == ball_id
             collision_trans = con.geom1 == ball_id and con.geom2 in collision_ids
@@ -97,15 +98,17 @@ class BallInACupCostFunction:
             with open(self.xml_path, "w") as f1:
                 f1.write(raw_xml)
 
-        sim = mujoco_py.MjSim(mujoco_py.load_model_from_path(self.xml_path), nsubsteps=4)
-        init_pos = sim.data.qpos.copy()
+        model = mujoco.MjModel.from_xml_path(self.xml_path)
+        data = mujoco.MjData(model)
+        # sim = mujoco_py.MjSim(mujoco_py.load_model_from_path(self.xml_path), nsubsteps=4)
+        init_pos = data.qpos.copy()
         init_vel = np.zeros_like(init_pos)
 
-        ball_id = sim.model._body_name2id["ball"]
-        ball_collision_id = sim.model._geom_name2id["ball_geom"]
-        goal_id = sim.model._site_name2id["cup_goal"]
-        goal_final_id = sim.model._site_name2id["cup_goal_final"]
-        collision_ids = [sim.model._geom_name2id[name] for name in self.collision_objects]
+        ball_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "ball")
+        ball_collision_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "ball_geom")
+        goal_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "cup_goal")
+        goal_final_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "cup_goal_final")
+        collision_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name) for name in self.collision_objects]
 
         start_pos = np.array([0.0, 0.58760536, 0.0, 1.36004913, 0.0, -0.32072943,
                               -1.57])
@@ -121,37 +124,41 @@ class BallInACupCostFunction:
         des_pos += start_pos[None, :]
 
         # Reset the system
-        sim.data.qpos[:] = init_pos
-        sim.data.qvel[:] = init_vel
-        sim.data.qpos[0:7] = start_pos
+        data.qpos[:] = init_pos
+        data.qvel[:] = init_vel
+        data.qpos[0:7] = start_pos
 
-        sim.step()
+        # sim.step()
+        for _ in range(4):
+            mujoco.mj_step(model, data)
 
-        sim.data.qpos[:] = init_pos
-        sim.data.qvel[:] = init_vel
-        sim.data.qpos[0:7] = start_pos
-        sim.data.body_xpos[ball_id, :] = np.copy(sim.data.site_xpos[goal_final_id, :]) - np.array([0., 0., 0.329])
+        data.qpos[:] = init_pos
+        data.qvel[:] = init_vel
+        data.qpos[0:7] = start_pos
+        data.xpos[ball_id, :] = np.copy(data.site_xpos[goal_final_id, :]) - np.array([0., 0., 0.329])
 
         # Stabilize the system around the initial position
         for i in range(0, 500):
-            sim.data.qpos[7:] = 0.
-            sim.data.qvel[7:] = 0.
-            sim.data.qpos[7] = -0.2
-            cur_pos = sim.data.qpos[0:7].copy()
-            cur_vel = sim.data.qvel[0:7].copy()
+            data.qpos[7:] = 0.
+            data.qvel[7:] = 0.
+            data.qpos[7] = -0.2
+            cur_pos = data.qpos[0:7].copy()
+            cur_vel = data.qvel[0:7].copy()
             trq = self.p_gains * (start_pos - cur_pos) + self.d_gains * (np.zeros_like(start_pos) - cur_vel)
-            sim.data.qfrc_applied[0:7] = trq
-            sim.step()
+            data.qfrc_applied[0:7] = trq
+            for _ in range(4):
+                mujoco.mj_step(model, data)
 
         for i in range(0, 500):
-            cur_pos = sim.data.qpos[0:7].copy()
-            cur_vel = sim.data.qvel[0:7].copy()
+            cur_pos = data.qpos[0:7].copy()
+            cur_vel = data.qvel[0:7].copy()
             trq = self.p_gains * (start_pos - cur_pos) + self.d_gains * (np.zeros_like(start_pos) - cur_vel)
-            sim.data.qfrc_applied[0:7] = trq
-            sim.step()
+            data.qfrc_applied[0:7] = trq
+            for _ in range(4):
+                mujoco.mj_step(model, data)
 
         if render:
-            viewer = mujoco_py.MjViewer(sim)
+            viewer = None # mujoco_py.MjViewer(sim)
         else:
             viewer = None
 
@@ -162,24 +169,25 @@ class BallInACupCostFunction:
         error = False
         while k < des_pos.shape[0] + 350:
             # Compute the current distance from the ball to the inner part of the cup
-            goal_pos = sim.data.site_xpos[goal_id]
-            ball_pos = sim.data.body_xpos[ball_id]
-            goal_final_pos = sim.data.site_xpos[goal_final_id]
+            goal_pos = data.site_xpos[goal_id]
+            ball_pos = data.xpos[ball_id]
+            goal_final_pos = data.site_xpos[goal_final_id]
             dists.append(np.linalg.norm(goal_pos - ball_pos))
             dists_final.append(np.linalg.norm(goal_final_pos - ball_pos))
 
             # Compute the controls
-            cur_pos = sim.data.qpos[0:7].copy()
-            cur_vel = sim.data.qvel[0:7].copy()
+            cur_pos = data.qpos[0:7].copy()
+            cur_vel = data.qvel[0:7].copy()
             k_actual = np.minimum(des_pos.shape[0] - 1, k)
             trq = self.p_gains * (des_pos[k_actual, :] - cur_pos) + self.d_gains * (des_vel[k_actual, :] - cur_vel)
             torques.append(trq)
 
             # Advance the simulation
-            sim.data.qfrc_applied[0:7] = trq
+            data.qfrc_applied[0:7] = trq
             try:
-                sim.step()
-            except mujoco_py.builder.MujocoException as e:
+                for _ in range(4):
+                    mujoco.mj_step(model, data)
+            except Exception as e:
                 print("Error in simulation: " + str(e))
                 error = True
                 # Copy the current torque as if it would have been applied until the end of the trajectory
@@ -190,7 +198,7 @@ class BallInACupCostFunction:
             k += 1
 
             # Check for a collision - in which case we end the simulation
-            if BallInACupCostFunction._check_collision(sim, ball_collision_id, collision_ids):
+            if BallInACupCostFunction._check_collision(data, ball_collision_id, collision_ids):
                 # Copy the current torque as if it would have been applied until the end of the trajectory
                 for i in range(k + 1, des_pos.shape[0]):
                     torques.append(trq)
