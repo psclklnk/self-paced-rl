@@ -3,6 +3,7 @@ import sprl.util.misc as util
 from scipy.stats import multivariate_normal
 from scipy.stats import norm
 import matplotlib.patches as patches
+from pathlib import Path
 
 
 class KLGaussian:
@@ -91,6 +92,16 @@ class KLGaussian:
             patch.height = l[1] * 6
             patch.angle = theta
 
+    def save(self, path: Path):
+        np.savez(path, lb=self.lower_bounds, ub=self.upper_bounds, mu=self.mu, sigma=self.sigma)
+
+    @staticmethod
+    def load(path: Path):
+        data = np.load(path)
+        dist = KLGaussian(data["lb"], data["ub"], data["mu"], data["sigma"])
+
+        return dist
+
 
 class KLPolicy:
 
@@ -117,6 +128,21 @@ class KLPolicy:
         sigma = self.compute_variance(state)
 
         return util.sample_normal_with_bounds(mu, sigma, self.lower_bounds, self.upper_bounds)
+
+    def save(self, path: Path):
+        if self.theta is not None:
+            np.savez(path, theta=self.theta, lb=self.lower_bounds, ub=self.upper_bounds, mu=self.mu, sigma=self.sigma)
+        else:
+            np.savez(path, lb=self.lower_bounds, ub=self.upper_bounds, mu=self.mu, sigma=self.sigma)
+
+    @staticmethod
+    def load(feature_func, path: Path):
+        data = np.load(path)
+        policy = KLPolicy(data["lb"], data["ub"], data["mu"], data["sigma"], feature_func)
+        if "theta" in data.keys():
+            policy.theta = data["theta"]
+
+        return policy
 
 
 class KLJoint:
@@ -161,3 +187,16 @@ class KLJoint:
 
         self.policy.theta = theta
         self.policy.sigma = sigma_y
+
+    def save(self, path: Path):
+        path.mkdir(exist_ok=True)
+        self.distribution.save(path / "dist.npz")
+        self.policy.save(path / "policy.npz")
+
+    @staticmethod
+    def load(path: Path, feature_func, epsilon, max_eta=100):
+        # We replace the data by loading the appropriate values
+        joint_policy = KLJoint(None, None, None, None, None, None, None, None, feature_func, epsilon, max_eta)
+        joint_policy.distribution = KLGaussian.load(path / "dist.npz")
+        joint_policy.policy = KLPolicy.load(path / "policy.npz", feature_func)
+        
